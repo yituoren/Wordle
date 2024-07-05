@@ -1,11 +1,15 @@
 use console;
 use std::io::{self, Write};
 
+
+mod game;
+mod builtin_words;
+
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_tty = atty::is(atty::Stream::Stdout);
 
-    if is_tty {
+    /*if is_tty {
         println!(
             "I am in a tty. Please print {}!",
             console::style("colorful characters").bold().blink().blue()
@@ -28,7 +32,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         print!("{} ", arg);
     }
     println!("");
-    // TODO: parse the arguments in `args`
+    // TODO: parse the arguments in `args`*/
+
+    game::std_play();
 
     Ok(())
 }
