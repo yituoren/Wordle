@@ -1,40 +1,56 @@
 use crate::builtin_words::{ACCEPTABLE, FINAL};
-use std::collections::HashMap;
-use text_io::read;
-
-
+use std::{cmp::Ordering, collections::HashMap};
+use rand::prelude::*;
+use rand::rngs::StdRng;
 
 //判断猜测是否合法
-fn guess_is_valid(guess: &str) -> Result<&str, &str>
+pub fn guess_is_valid(guess: &str, guess_file: &Vec<String>) -> Result<String, String>
 {
+    if !guess_file.is_empty()
+    {
+        for word in guess_file.iter()
+        {
+            if guess == word
+            {
+                return Ok(guess.to_string())
+            }
+        }
+        return Err("INVALID".to_string());
+
+    }
     for word in ACCEPTABLE
     {
-        if guess == *word {return Ok(guess);}
+        if guess == word.to_uppercase() {return Ok(guess.to_string());}
     }
-    Err("INVALID")
+    Err("INVALID".to_string())
 }
 
 //判断答案是否合法
-fn answer_is_valid(answer: &str) -> Result<&str, &str>
+pub fn answer_is_valid(answer: &str, answer_file: &Vec<String>) -> Result<String, String>
 {
+    if !answer_file.is_empty()
+    {
+        for word in answer_file.iter()
+        {
+            if answer == word
+            {
+                return Ok(answer.to_string())
+            }
+        }
+        return Err("INVALID".to_string());
+
+    }
     for word in FINAL
     {
-        if answer == *word {return Ok(answer);}
+        if answer == word.to_uppercase() {return Ok(answer.to_string());}
     }
-    Err("INVALID")
+    Err("INVALID".to_string())
 }
 
-/*#[test]
-fn test()
-{
-    assert!(guess_is_valid("aahed"));
-    assert_eq!(answer_is_valid("aahed"), false);
-}*/
-
 //代表单词所有信息的单词结构体
-struct Word
+pub struct Word
 {
-    origin: String,
+    pub origin: String,
     letter: HashMap<char, Vec<u8>>,
 }
 
@@ -112,21 +128,21 @@ impl Word
 }
 
 //生成答案单词
-fn gen_answer(word: &str) -> Result<Word, &str>
+pub fn gen_answer(word: &str, answer_file: &Vec<String>) -> Result<Word, String>
 {
-    let answer = answer_is_valid(&word)?;
-    Ok(Word::new(&answer.to_uppercase()))
+    let answer = answer_is_valid(&word.to_uppercase(), answer_file)?;
+    Ok(Word::new(&answer))
 }
 
 //生成猜测单词
-fn gen_guess(word: &str) -> Result<Word, &str>
+pub fn gen_guess(word: &str, guess_file: &Vec<String>) -> Result<Word, String>
 {
-    let guess = guess_is_valid(&word)?;
-    Ok(Word::new(&guess.to_uppercase()))
+    let guess = guess_is_valid(&word.to_uppercase(), guess_file)?;
+    Ok(Word::new(&guess))
 }
 
 //从标准输入获取答案
-fn std_answer() -> Word
+pub fn std_answer(answer_file: &Vec<String>) -> Word
 {
     //println!("PLEASE CHOOSE AN ANSWER: ");
     let mut word: String = "".to_string();
@@ -137,7 +153,7 @@ fn std_answer() -> Word
             Ok(_) => (),
             Err(error) => println!("ERROR: {}", error),
         }
-        match gen_answer(word.trim())
+        match gen_answer(word.trim(), answer_file)
         {
             Ok(tmp) => break tmp,
             Err(warning) => 
@@ -151,31 +167,80 @@ fn std_answer() -> Word
 }
 
 //从标准输入获取猜测
-fn std_guess(time: u8) -> Word
+pub fn std_guess(guess_file: &Vec<String>, tmp_result: &[u8; 5], record: &Vec<String>, difficult: &bool) -> Word
 {
-    //println!("GUESS {} : ", time);
     let mut word: String = "".to_string();
     loop
     {
         match std::io::stdin().read_line(&mut word)
         {
             Ok(_) => (),
-            Err(error) => println!("ERROR: {}", error),
+            Err(error) =>
+            {
+                println!("ERROR: {}", error);
+                word = "".to_string();
+                continue;
+            }
         }
-        match gen_guess(word.trim())
+        word = word.to_uppercase().to_string();
+        if *difficult && !record.is_empty()
+        {
+            let last: String = record.last().unwrap().to_string();
+            let mut is_valid: bool = true;
+            let mut count: usize = 0;
+            for i in last.chars()
+            {
+                match tmp_result[count]
+                {
+                    3 =>
+                    {
+                        if word.chars().nth(count).unwrap() != i
+                        {
+                            is_valid = false;
+                            break;
+                        }
+                    }
+                    2 =>
+                    {
+                        match word.find(i)
+                        {
+                            Some(_) => (),
+                            None =>
+                            {
+                                is_valid = false;
+                                break;
+                            }
+                        }
+                    }
+                    1 | 0 => (),
+                    _ =>
+                    {
+                        is_valid = false;
+                        break;
+                    }
+                }
+                count += 1;
+            }
+            if !is_valid
+            {
+                println!("INVALID");
+                word = "".to_string();
+                continue;
+            }
+        }
+        match gen_guess(word.trim(), guess_file)
         {
             Ok(tmp) => break tmp,
             Err(warning) => 
             {
                 println!("{}", warning);
-                //println!("GUESS {} : ", time);
             }
         }
         word = "".to_string();
     }
 }
 
-fn test_update_and_show(guess: &str, tmp_result: &[u8; 5], mut result: HashMap<char, u8>) -> (HashMap<char, u8>, bool)
+pub fn test_update_and_show(guess: &str, tmp_result: &[u8; 5], mut result: HashMap<char, u8>) -> (HashMap<char, u8>, bool)
 {
     let mut is_correct: bool = true;
     let mut count: usize = 0;
@@ -224,20 +289,50 @@ fn test_update_and_show(guess: &str, tmp_result: &[u8; 5], mut result: HashMap<c
     (result, is_correct)
 }
 
-pub fn std_play()
+pub fn random_answer(answer_file: &mut Vec<String>, day: &mut u64, seed: &u64) -> Result<Word, String>
 {
-    let answer: Word = std_answer();
-    let mut result: HashMap<char, u8> = HashMap::new();
-    let mut is_correct: bool = false;
-    for i in 1..=6
+    let mut rng = StdRng::seed_from_u64(*seed);
+    if answer_file.is_empty()
     {
-        let guess: Word = std_guess(i);
-        (result, is_correct) = test_update_and_show(&guess.origin, &answer.compare(&guess.origin), result);
-        if is_correct
+        let mut copy= FINAL.to_vec();
+        copy.shuffle(&mut rng);
+        if *day > copy.len() as u64
         {
-            println!("CORRECT {}", i);
-            return;
+            return Err("INVALID COMMAND LINE: DAY".to_string());
+        }
+        else
+        {
+            let word = copy[(*day - 1) as usize];
+            *day = (*day + 1) % copy.len() as u64;
+            return gen_answer(word, answer_file);
         }
     }
-    println!("FAILED {}", answer.origin);
+    else
+    {
+        let copy = answer_file.clone();
+        answer_file.shuffle(&mut rng);
+        if *day > answer_file.len() as u64
+        {
+            return Err("INVALID COMMAND LINE: DAY".to_string());
+        }
+        else
+        {
+            let word = answer_file[(*day - 1) as usize].clone();
+            *answer_file = copy;
+            *day = (*day + 1) % answer_file.len() as u64;
+            return gen_answer(&word, answer_file);
+        }
+    }
+}
+
+pub fn cmp(a: &(&String, &i32), b: &(&String, &i32)) -> Ordering
+{
+    if a.1 == b.1
+    {
+        return b.0.cmp(a.0);
+    }
+    else
+    {
+        return a.1.cmp(b.1);
+    }
 }
