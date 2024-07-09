@@ -5,6 +5,7 @@ use std::{collections::HashMap, fmt, io::{self, Write}};
 mod arg;
 mod game;
 mod builtin_words;
+mod file;
 
 #[derive(Debug)]
 struct MyError
@@ -43,14 +44,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Welcome to wordle, {}!", line.trim());*/
 
     //处理命令行
-    let (mut cmd, is_valid) = arg::process_arg();
-    if !is_valid
+    let mut cmd = match arg::process_arg()
     {
-        return Err(Box::new(MyError{source: "INVALID COMMAND LINE".to_string()}));
-    }
+        Ok(tmp) => tmp,
+        Err(error) => return Err(Box::new(MyError{ source: error, }))
+    };
     if !arg::arg_is_valid(&cmd)
     {
-        return Err(Box::new(MyError{source: "INVALID COMMAND LINE".to_string()}));
+        return Err(Box::new(MyError{ source: "INVALID COMMAND LINE LOGIC".to_string(), }));
     }
 
     //全局参数
@@ -62,6 +63,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut success_try: i32 = 0;
     let mut total_word: HashMap<String, i32> = HashMap::new();
     let mut difficult: bool = false;
+    let mut game_data: file::GameData = file::GameData
+    {
+        total_rounds: 0,
+        games: Vec::new(),
+    };
     if let Some(_i) = cmd.mode.get("difficult")
     {
         difficult = true;
@@ -75,6 +81,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(k) = cmd.value.get("seed")
     {
         seed = *k;
+    }
+
+    //读取游戏存档
+    if let Some(state) = cmd.info.get("state")
+    {
+        if let Ok(tmp) = file::read_state(state)
+        {
+            game_data = tmp;
+            total_round = game_data.total_rounds;
+            if game_data.total_rounds as usize != game_data.games.len()
+            {
+                return Err(Box::new(MyError{source: "INVALID STATE".to_string()}));
+            }
+            for i in game_data.games.iter()
+            {
+                if i.guesses.len() > 6
+                {
+                    return Err(Box::new(MyError{source: "INVALID STATE".to_string()}));
+                }
+                match i.guesses.last()
+                {
+                    Some(j) =>
+                    {
+                        if i.answer == *j
+                        {
+                            success_round += 1;
+                            success_try += i.guesses.len() as i32;
+                        }
+                    }
+                    None => return Err(Box::new(MyError{source: "INVALID STATE".to_string()})),
+                }
+                for j in i.guesses.iter()
+                {
+                    let count = total_word.entry(j.to_string()).or_insert(0);
+                    *count += 1;
+                }
+            }
+        }
+        else
+        {
+            return Err(Box::new(MyError{source: "INVALID STATE".to_string()}));
+        }
     }
 
 //主体
@@ -98,7 +146,7 @@ while again
             match game::gen_answer(i, &cmd.answer_file)
             {
                 Ok(tmp) => answer = tmp,
-                Err(_tmp) => return Err(Box::new(MyError{source: "INVALID COMMAND LINE: WORD".to_string()})),
+                Err(_tmp) => return Err(Box::new(MyError{source: "INVALID WORD".to_string()})),
             }
             again = false;
         }
@@ -110,6 +158,7 @@ while again
 
     //记录每局信息
     let mut record: Vec<String> = Vec::new();
+    let mut this_round: file::Round = file::Round { answer: answer.origin.clone(), guesses: Vec::new() };
 
     //开始猜测
     let mut result: HashMap<char, u8> = HashMap::new();
@@ -121,6 +170,7 @@ while again
 
         let tmp = guess.origin.clone();
         record.push(tmp.clone());
+        this_round.guesses.push(tmp.clone());
         let count = total_word.entry(tmp.clone()).or_insert(0);
         *count += 1;
 
@@ -138,6 +188,9 @@ while again
     {
         println!("FAILED {}", answer.origin);
     }
+    //更新游戏存档
+    game_data.games.push(this_round);
+    game_data.total_rounds += 1;
 
     //打印数据
     if let Some(_i) = cmd.mode.get("stats")
@@ -166,7 +219,7 @@ while again
         match std::io::stdin().read_line(&mut tmp)
         {
             Ok(0) => again = false,
-            Err(error) => println!("ERROR: {}", error),
+            Err(error) => println!("{}", error),
             Ok(_) =>
             {
                 match tmp.trim()
@@ -179,5 +232,15 @@ while again
         }
     }
 }
+
+    //存档
+    if let Some(state) = cmd.info.get("state")
+    {
+        if let Err(_) = file::write_state(&game_data, state)
+        {
+            return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+        }
+    }
+
     Ok(())
 }
