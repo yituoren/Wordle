@@ -325,7 +325,7 @@ pub fn random_answer(answer_file: &mut Vec<String>, day: &mut u64, seed: &u64) -
     }
 }
 
-pub fn cmp(a: &(&String, &i32), b: &(&String, &i32)) -> Ordering
+pub fn cmp_ref<T: Ord>(a: &(&String, &T), b: &(&String, &T)) -> Ordering
 {
     if a.1 == b.1
     {
@@ -334,5 +334,17 @@ pub fn cmp(a: &(&String, &i32), b: &(&String, &i32)) -> Ordering
     else
     {
         return a.1.cmp(b.1);
+    }
+}
+
+pub fn cmp_val<X, T: PartialOrd>(a: &(X, T), b: &(X, T)) -> Ordering
+{
+    if let Some(order) = b.1.partial_cmp(&a.1)
+    {
+        order
+    }
+    else
+    {
+        Ordering::Greater
     }
 }
