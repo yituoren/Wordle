@@ -1,11 +1,11 @@
 use serde::{Serialize, Deserialize};
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, BufWriter};
+use std::io::{BufRead, BufReader, BufWriter};
 use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::io::Read;
 
-//创建两个具有Serialize和Deserialize的结构体记录数据，方便读写
+//创建具有Serialize和Deserialize的结构体记录数据，方便读写
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Round
 {
@@ -34,6 +34,7 @@ pub struct Config
     pub word: Option<String>,
 }
 
+//读取词库
 pub fn read_txt(file_name: &str) -> std::io::Result<Vec<String>>
 {
     let mut set: HashSet<String> = HashSet::new();
@@ -53,6 +54,7 @@ pub fn read_txt(file_name: &str) -> std::io::Result<Vec<String>>
     Ok(words)
 }
 
+//读取存档
 pub fn read_state(file_name: &str) -> std::io::Result<GameData>
 {
     match File::open(file_name)
@@ -81,6 +83,7 @@ pub fn read_state(file_name: &str) -> std::io::Result<GameData>
     }
 }
 
+//写入存档
 pub fn write_state(game_data: &GameData, file_name: &str) -> std::io::Result<()>
 {
     let file = File::create(file_name)?;
@@ -89,6 +92,7 @@ pub fn write_state(game_data: &GameData, file_name: &str) -> std::io::Result<()>
     Ok(())
 }
 
+//读取配置
 pub fn read_config(file_name: &str) -> std::io::Result<Config>
 {
     let file = File::open(file_name)?;

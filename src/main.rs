@@ -1,6 +1,5 @@
-use console;
 use game::Word;
-use std::{collections::HashMap, fmt, io::{self, Write}};
+use std::{collections::HashMap, fmt};
 
 mod arg;
 mod game;
@@ -8,6 +7,7 @@ mod builtin_words;
 mod file;
 mod solver;
 
+//定义报错
 #[derive(Debug)]
 struct MyError
 {
@@ -23,7 +23,6 @@ impl fmt::Display for MyError
 impl std::error::Error for MyError{}
 
 
-/// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_tty = atty::is(atty::Stream::Stdout);
 
@@ -169,14 +168,17 @@ while again
     let mut tmp_result: [u8; 5] = [0; 5];
     for i in 1..=6
     {
+        //获取猜测
         guess = game::std_guess(&cmd.guess_file, &tmp_result, &record, &difficult);
 
+        //更新统计数据
         let tmp = guess.origin.clone();
         record.push(tmp.clone());
         this_round.guesses.push(tmp.clone());
         let count = total_word.entry(tmp.clone()).or_insert(0);
         *count += 1;
 
+        //更新结果
         tmp_result = answer.compare(&guess.origin);
         (result, is_correct) = game::test_update_and_show(&guess.origin, &tmp_result, result);
         if is_correct
@@ -191,6 +193,7 @@ while again
     {
         println!("FAILED {}", answer.origin);
     }
+
     //更新游戏存档
     game_data.games.push(this_round);
     game_data.total_rounds += 1;
@@ -217,7 +220,6 @@ while again
     //是否再来
     if again
     {
-        //println!("WANT ANOTHER ROUND? [Y / N]");
         let mut another = "".to_string();
         match std::io::stdin().read_line(&mut another)
         {
@@ -306,6 +308,7 @@ else
         let mut full_result: Vec<[u8; 5]> = Vec::new();
         for i in 1..=6
         {
+            //是否需要提示
             let mut is_help = false;
             let mut help = "".to_string();
             println!("WANT SOME HELP? [Y / N]");
@@ -326,16 +329,23 @@ else
             if is_help
             {
                 let (info, help) = solver::help(&record, &full_result);
-                print!("THE MOST INFORMATIVE GUESSES ARE:");
+                print!("THE MOST INFORMATIVE GUESSES ARE:");//可选词中信息熵最大的
                 for i in 0..std::cmp::min(5 as usize, info.len())
                 {
                     print!(" {}: {:.2}", info[i].0, info[i].1);
                 }
                 println!("");
-                print!("THE BEST GUESSES ARE:");
+                print!("THE BEST GUESSES ARE:");//可能的答案中信息熵最大的
                 for i in 0..std::cmp::min(5 as usize, help.len())
                 {
                     print!(" {}: {:.2}", help[i].0, help[i].1);
+                }
+                println!("");
+                let all = solver::solve(&record, &full_result, 6 - i);
+                print!("THE GLOBAL OPTIMUM GUESSES ARE:");//全局最优的
+                for i in 0..std::cmp::min(5 as usize, all.len())
+                {
+                    print!(" {}: {:.2}", all[i].0, all[i].1);
                 }
                 println!("");
             }
@@ -350,7 +360,7 @@ else
     
             tmp_result = answer.compare(&guess.origin);
             full_result.push(tmp_result);
-            (best_result, is_correct) = game::test_update_and_show(&guess.origin, &tmp_result, best_result);
+            (best_result, is_correct) = game::user_update_and_show(&record, &full_result, best_result);
             if is_correct
             {
                 println!("CORRECT {}", i);

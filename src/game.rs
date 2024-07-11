@@ -2,6 +2,8 @@ use crate::builtin_words::{ACCEPTABLE, FINAL};
 use std::{cmp::Ordering, collections::HashMap};
 use rand::prelude::*;
 use rand::rngs::StdRng;
+use crossterm::{execute, style::{Color, Print, ResetColor, SetForegroundColor},};
+use std::io::stdout;
 
 //判断猜测是否合法
 pub fn guess_is_valid(guess: &str, guess_file: &Vec<String>) -> Result<String, String>
@@ -240,6 +242,7 @@ pub fn std_guess(guess_file: &Vec<String>, tmp_result: &[u8; 5], record: &Vec<St
     }
 }
 
+//测试模式更新结果并输出
 pub fn test_update_and_show(guess: &str, tmp_result: &[u8; 5], mut result: HashMap<char, u8>) -> (HashMap<char, u8>, bool)
 {
     let mut is_correct: bool = true;
@@ -289,6 +292,73 @@ pub fn test_update_and_show(guess: &str, tmp_result: &[u8; 5], mut result: HashM
     (result, is_correct)
 }
 
+pub fn user_update_and_show(guesses: &Vec<String>, full_result: &Vec<[u8; 5]>, mut best_result: HashMap<char, u8>) -> (HashMap<char, u8>, bool)
+{
+    let mut is_correct: bool = true;
+    let mut big_count: usize = 0;
+    let mut color = Color::Black;
+    let mut stdout = stdout();
+    for guess in guesses.iter()
+    {
+    print!("     ");
+    let mut small_count: usize = 0;
+    for letter in guess.chars()
+    {
+        let tmp = best_result.entry(letter).or_insert(0);
+        if full_result[big_count][small_count] > *tmp
+        {
+            *tmp = full_result[big_count][small_count];
+        }
+        match full_result[big_count][small_count]
+        {
+            3 => {color = Color::Green;},
+            2 =>
+            {
+                color = Color::Yellow;
+                if big_count == guesses.len() - 1 { is_correct = false; }
+            },
+            1 =>
+            {
+                color = Color::Red;
+                if big_count == guesses.len() - 1 { is_correct = false; }
+            },
+            _ =>
+            {
+                color = Color::Black;
+                if big_count == guesses.len() - 1 { is_correct = false; }
+            }
+        }
+        execute!(stdout, SetForegroundColor(color), Print(letter), ResetColor, Print(" "));
+        small_count += 1;
+    }
+    big_count += 1;
+    println!("");
+    }
+    
+    let keyboard = [
+        "Q W E R T Y U I O P",
+        " A S D F G H J K L",
+        "  Z X C V B N M"
+    ];
+
+    for row in keyboard.iter()
+    {
+        for letter in row.chars()
+        {
+            match best_result.get(&letter)
+            {
+                Some(3) => color = Color::Green,
+                Some(2) => color = Color::Yellow,
+                Some(1) => color = Color::Red,
+                Some(_) | None => color = Color::Black,
+            }
+            execute!(stdout, SetForegroundColor(color), Print(letter), ResetColor);
+        }
+        println!("");
+    }
+    (best_result, is_correct)
+}
+//随机答案
 pub fn random_answer(answer_file: &mut Vec<String>, day: &mut u64, seed: &u64) -> Result<Word, String>
 {
     let mut rng = StdRng::seed_from_u64(*seed);
@@ -325,6 +395,7 @@ pub fn random_answer(answer_file: &mut Vec<String>, day: &mut u64, seed: &u64) -
     }
 }
 
+//两个需要的比较函数
 pub fn cmp_ref<T: Ord>(a: &(&String, &T), b: &(&String, &T)) -> Ordering
 {
     if a.1 == b.1
