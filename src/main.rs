@@ -1,14 +1,12 @@
 use game::{Word, get_input_span};
 use std::{collections::HashMap, fmt};
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
 use std::io;
-use tui::backend::{Backend, CrosstermBackend};
-use tui::layout::{Constraint, Direction, Layout};
-use tui::style::{Color, Modifier, Style};
+use tui::backend::CrosstermBackend;
+use tui::style::Style;
 use tui::text::{Span, Spans};
-use tui::widgets::{Block, Borders, Paragraph};
 use tui::Terminal;
 
 mod arg;

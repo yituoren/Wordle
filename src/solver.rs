@@ -4,8 +4,10 @@ use std::cmp::{Ordering, min};
 use rayon::prelude::*;
 use std::sync::Arc;
 
-// 单步最优
+//单步最优
 pub fn help(record: &Vec<String>, full_result: &Vec<[u8; 5]>) -> (Vec<(String, f64)>, Vec<(String, f64)>) {
+
+    //寻找可能答案
     let possible_answers: Vec<String> = ACCEPTABLE
         .par_iter()
         .filter_map(|&possible_answer| {
@@ -30,6 +32,7 @@ pub fn help(record: &Vec<String>, full_result: &Vec<[u8; 5]>) -> (Vec<(String, f
     let possible_answers_arc = Arc::new(possible_answers);
     let possible_answers_len = possible_answers_arc.len() as f64;
 
+    //对所有候选词进行遍历计算信息熵
     let mut info_sorted: Vec<(String, f64)> = ACCEPTABLE
         .par_iter()
         .filter_map(|&possible_guess| {
@@ -55,8 +58,10 @@ pub fn help(record: &Vec<String>, full_result: &Vec<[u8; 5]>) -> (Vec<(String, f
         })
         .collect();
 
+    //排序
     info_sorted.par_sort_by(|a, b| cmp_val(a, b));
 
+    //筛选出可能是答案的
     let help: Vec<(String, f64)> = info_sorted
         .par_iter()
         .filter(|x| possible_answers_arc.contains(&x.0))
@@ -66,8 +71,10 @@ pub fn help(record: &Vec<String>, full_result: &Vec<[u8; 5]>) -> (Vec<(String, f
     (info_sorted, help)
 }
 
+//计算复杂熵的两个函数
 
-/*fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64 {
+//优化后
+fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64 {
     let possibilities: HashMap<Vec<[u8; 5]>, usize> = possible_answers
         .par_iter()
         .map(|possible_answer| {
@@ -97,9 +104,10 @@ pub fn help(record: &Vec<String>, full_result: &Vec<[u8; 5]>) -> (Vec<(String, f
         .sum();
 
     entropy
-} */
+} 
 
-fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64
+//优化前
+/*fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64
 {
     let mut possibilities: HashMap<Vec<[u8; 5]>, usize> = HashMap::new();
     for possible_answer in possible_answers.iter()
@@ -119,7 +127,7 @@ fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64
         entropy += tmp * (-tmp.log2());
     }
     entropy
-}
+}*/
 
 #[derive(Debug, Clone)]
 struct Path {
@@ -147,11 +155,11 @@ impl Ord for Path {
     }
 }
 
-// 全局最优
+//全局最优
 pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec<(String, f64)> {
     let mut possible_answers: Vec<String> = Vec::new();
 
-    // 使用并行计算筛选可能的答案
+    //使用并行计算筛选可能的答案
     possible_answers = ACCEPTABLE.par_iter()
         .filter_map(|possible_answer| {
             let mut count: usize = 0;
@@ -171,12 +179,13 @@ pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec
         })
         .collect();
 
+    //最后一步用单步最优即可    
     if possible_answers.len() <= 5 || time <= 1 {
         let (_, help) = help(record, full_result);
         return help;
     }
 
-    // 使用并行计算来初始化 solve
+    //使用并行计算来初始化优先队列
     let mut solve: BinaryHeap<Path> = ACCEPTABLE.par_iter()
         .filter(|&&possible_guess| !record.contains(&possible_guess.to_uppercase()))
         .map(|&possible_guess| {
@@ -188,11 +197,12 @@ pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec
         })
         .collect();
 
-    // 只保留前10个最优路径
+    //只保留前10个最优路径
     while solve.len() > 10 {
         solve.pop();
     }
 
+    //迭代后续情况并进行减枝
     let t = min(time, 3);
     for _i in 1..t {
         let mut new_heap: BinaryHeap<Path> = solve.par_iter()
@@ -309,6 +319,7 @@ pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec
     info
 }*/
 
+//测试函数
 pub fn test()
 {
     let mut count = 0;
@@ -321,8 +332,8 @@ pub fn test()
         let mut full_result: Vec<[u8; 5]> = Vec::new();
         let mut best_result: HashMap<char, u8> = HashMap::new();
         let mut is_correct: bool = false;
-        record.push("SALET".to_string());
-        full_result.push(answer.compare("SALET"));
+        record.push("TARES".to_string());
+        full_result.push(answer.compare("TARES"));
         (best_result, is_correct) = game::user_update_and_show(&record, &full_result, best_result);
         if is_correct
         {
@@ -349,7 +360,7 @@ pub fn test()
         {
             count += 1;
             steps += 7;
-            println!("{} {} {}", count, 7, steps);
+            println!("{} {} {}", count, 7, steps);//失败时认为步数为7
         }
     }
 }

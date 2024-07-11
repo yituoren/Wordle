@@ -1,15 +1,14 @@
 use crate::builtin_words::{ACCEPTABLE, FINAL};
-use std::{cmp::Ordering, collections::HashMap, process::Output};
+use std::{cmp::Ordering, collections::HashMap};
 use rand::prelude::*;
 use rand::rngs::StdRng;
 use crossterm::{execute, style::{Color, Print, ResetColor, SetForegroundColor},};
 use std::io::stdout;
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
-use std::error::Error;
+use crossterm::event::{self, Event, KeyCode};
 use std::io;
-use tui::{backend::{Backend, CrosstermBackend}};
+use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout};
-use tui::style::{Modifier, Style};
+use tui::style::Style;
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, Paragraph};
 use tui::Terminal;
@@ -186,8 +185,9 @@ pub fn tui_answer<B: Backend>(terminal: &mut Terminal<B>, answer_file: &Vec<Stri
         match get_input_str(terminal, &output)
         {
             Ok(tmp) => word = tmp,
-            Err(error) => 
+            Err(_) => 
             {
+                word = "".to_string();
                 continue;
             }
         }
@@ -196,7 +196,7 @@ pub fn tui_answer<B: Backend>(terminal: &mut Terminal<B>, answer_file: &Vec<Stri
             Ok(tmp) => break tmp,
             Err(warning) => 
             {
-                output = output + &warning + "\n";
+                output = output + &warning + " ANSWER\n";
                 continue;
             }
         }
@@ -338,7 +338,7 @@ pub fn tui_guess<B: Backend>(terminal: &mut Terminal<B>, guess_file: &Vec<String
             }
             if !is_valid
             {
-                str += "INVALID\n";
+                str += "INVALID GUESS\n";
                 word = get_input_str(terminal, &str).unwrap();
                 continue;
             }
@@ -348,7 +348,7 @@ pub fn tui_guess<B: Backend>(terminal: &mut Terminal<B>, guess_file: &Vec<String
             Ok(tmp) => break tmp,
             Err(warning) => 
             {
-                str = str + &warning + "\n";
+                str = str + &warning + " GUESS\n";
                 word = get_input_str(terminal, &str).unwrap();
             }
         }
@@ -735,13 +735,13 @@ fn draw_ui_span<B: Backend>(terminal: &mut Terminal<B>, input: &str, output: &Ve
         //输入框
         let input_widget = Paragraph::new(input)
             .style(Style::default().fg(tui::style::Color::Blue))
-            .block(Block::default().borders(Borders::ALL));
+            .block(Block::default().borders(Borders::ALL).title("INPUT"));
         f.render_widget(input_widget, chunks[0]);
 
         //输出框
         let output_widget = Paragraph::new(output.clone())
             .style(Style::default().fg(tui::style::Color::White))
-            .block(Block::default().borders(Borders::ALL));
+            .block(Block::default().borders(Borders::ALL).title("OUTPUT"));
         f.render_widget(output_widget, chunks[1]);
     })?;
 
