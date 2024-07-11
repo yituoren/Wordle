@@ -8,6 +8,7 @@ use tui::backend::CrosstermBackend;
 use tui::style::Style;
 use tui::text::{Span, Spans};
 use tui::Terminal;
+use text_io::read;
 
 mod arg;
 mod game;
@@ -404,7 +405,7 @@ if is_ui//TUI模式
                 [Span::raw("SUCCESS: "),
                 Span::raw(success_round.to_string()),
                 Span::raw(" "),
-                Span::raw("TOTAL: "),
+                Span::raw("FAILED: "),
                 Span::raw((total_round - success_round).to_string()),
                 Span::raw(" "),
                 Span::raw("AVERAGE: "),
