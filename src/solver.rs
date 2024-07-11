@@ -1,65 +1,104 @@
-use crate::{builtin_words::ACCEPTABLE, game::{cmp_val, Word}};
+use crate::{builtin_words::{ACCEPTABLE, FINAL}, game::{self, cmp_val, Word}};
 use std::{collections::{BinaryHeap, HashMap}, vec};
 use std::cmp::{Ordering, min};
+use rayon::prelude::*;
+use std::sync::Arc;
 
-//单步最优
-pub fn help(record: &Vec<String>, full_result: &Vec<[u8; 5]>) -> (Vec<(String, f64)>, Vec<(String, f64)>)
-{
-    let mut info: Vec<(String, f64)> = Vec::new();
-    let mut possible_answers: Vec<String> = Vec::new();
-
-    //筛选可能答案
-    for possible_answer in ACCEPTABLE
-    {
-        let mut count: usize = 0;
-        let mut possible: bool = true;
-        for guess in record.iter()
-        {
-            if Word::new(&possible_answer.to_uppercase()).compare(&guess) != full_result[count]
-            {
-                possible = false;
-                break;
+// 单步最优
+pub fn help(record: &Vec<String>, full_result: &Vec<[u8; 5]>) -> (Vec<(String, f64)>, Vec<(String, f64)>) {
+    let possible_answers: Vec<String> = ACCEPTABLE
+        .par_iter()
+        .filter_map(|&possible_answer| {
+            let uppercased = possible_answer.to_uppercase();
+            let mut count: usize = 0;
+            let mut possible = true;
+            for guess in record.iter() {
+                if Word::new(&uppercased).compare(&guess) != full_result[count] {
+                    possible = false;
+                    break;
+                }
+                count += 1;
             }
-            count += 1;
-        }
-        if possible
-        {
-            possible_answers.push(possible_answer.to_uppercase());
-        }
-    }
+            if possible {
+                Some(uppercased)
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    //计算可选词信息熵
-    for possible_guess in ACCEPTABLE
-    {
-        if record.contains(&possible_guess.to_uppercase())
-        {
-            continue;
-        }
-        let mut possibilities: HashMap<[u8; 5], usize> = HashMap::new();
-        for possible_answer in possible_answers.iter()
-        {
-            let tmp = possibilities.entry(Word::new(&possible_answer).compare(&possible_guess.to_uppercase())).or_insert(0);
-            *tmp += 1;
-        }
+    let possible_answers_arc = Arc::new(possible_answers);
+    let possible_answers_len = possible_answers_arc.len() as f64;
 
-        let mut entropy: f64 = 0.0;
-        for p in possibilities.iter()
-        {
-            let tmp: f64 = *p.1 as f64 / possible_answers.len() as f64;
-            entropy += tmp * (-tmp.log2());
-        }
-        info.push((possible_guess.to_uppercase(), entropy));
-    }
+    let mut info_sorted: Vec<(String, f64)> = ACCEPTABLE
+        .par_iter()
+        .filter_map(|&possible_guess| {
+            let uppercased_guess = possible_guess.to_uppercase();
+            if record.contains(&uppercased_guess) {
+                return None;
+            }
+            let mut possibilities: HashMap<[u8; 5], usize> = HashMap::new();
+            for possible_answer in possible_answers_arc.iter() {
+                let tmp = possibilities.entry(Word::new(&possible_answer).compare(&uppercased_guess)).or_insert(0);
+                *tmp += 1;
+            }
 
-    //排序
-    info.sort_by(|a, b|cmp_val(a, b));
+            let entropy: f64 = possibilities
+                .values()
+                .map(|&count| {
+                    let tmp = count as f64 / possible_answers_len;
+                    tmp * (-tmp.log2())
+                })
+                .sum();
 
-    //筛选其中是可能答案的
-    let help: Vec<(String, f64)> = info.iter().filter(|x| possible_answers.contains(&x.0)).cloned().collect();
-    (info, help)
+            Some((uppercased_guess, entropy))
+        })
+        .collect();
+
+    info_sorted.par_sort_by(|a, b| cmp_val(a, b));
+
+    let help: Vec<(String, f64)> = info_sorted
+        .par_iter()
+        .filter(|x| possible_answers_arc.contains(&x.0))
+        .cloned()
+        .collect();
+
+    (info_sorted, help)
 }
 
-//计算复杂情况的信息熵
+
+/*fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64 {
+    let possibilities: HashMap<Vec<[u8; 5]>, usize> = possible_answers
+        .par_iter()
+        .map(|possible_answer| {
+            let results: Vec<[u8; 5]> = words
+                .iter()
+                .map(|word| Word::new(&possible_answer).compare(word))
+                .collect();
+            results
+        })
+        .fold(HashMap::new, |mut acc, results| {
+            *acc.entry(results).or_insert(0) += 1;
+            acc
+        })
+        .reduce(HashMap::new, |mut acc, map| {
+            for (key, value) in map {
+                *acc.entry(key).or_insert(0) += value;
+            }
+            acc
+        });
+
+    let entropy: f64 = possibilities
+        .iter()
+        .map(|(_, count)| {
+            let p = *count as f64 / possible_answers.len() as f64;
+            p * (-p.log2())
+        })
+        .sum();
+
+    entropy
+} */
+
 fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64
 {
     let mut possibilities: HashMap<Vec<[u8; 5]>, usize> = HashMap::new();
@@ -82,40 +121,115 @@ fn compute_entropy(words: &Vec<String>, possible_answers: &Vec<String>) -> f64
     entropy
 }
 
-#[derive(Debug)]
-struct Path
-{
+#[derive(Debug, Clone)]
+struct Path {
     words: Vec<String>,
     entropy: f64,
 }
 
-impl PartialEq for Path
-{
-    fn eq(&self, other: &Self) -> bool 
-    {
+impl PartialEq for Path {
+    fn eq(&self, other: &Self) -> bool {
         self.entropy == other.entropy
     }
 }
 
 impl Eq for Path {}
 
-impl PartialOrd for Path 
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
-    {
+impl PartialOrd for Path {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.entropy.partial_cmp(&self.entropy)
     }
 }
 
 impl Ord for Path {
-    fn cmp(&self, other: &Self) -> Ordering
-    {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
 }
 
-//全局最优
-pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec<(String, f64)>
+// 全局最优
+pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec<(String, f64)> {
+    let mut possible_answers: Vec<String> = Vec::new();
+
+    // 使用并行计算筛选可能的答案
+    possible_answers = ACCEPTABLE.par_iter()
+        .filter_map(|possible_answer| {
+            let mut count: usize = 0;
+            let mut possible: bool = true;
+            for guess in record.iter() {
+                if Word::new(&possible_answer.to_uppercase()).compare(&guess) != full_result[count] {
+                    possible = false;
+                    break;
+                }
+                count += 1;
+            }
+            if possible {
+                Some(possible_answer.to_uppercase())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if possible_answers.len() <= 5 || time <= 1 {
+        let (_, help) = help(record, full_result);
+        return help;
+    }
+
+    // 使用并行计算来初始化 solve
+    let mut solve: BinaryHeap<Path> = ACCEPTABLE.par_iter()
+        .filter(|&&possible_guess| !record.contains(&possible_guess.to_uppercase()))
+        .map(|&possible_guess| {
+            let new_words = vec![possible_guess.to_uppercase()];
+            Path {
+                words: new_words.clone(),
+                entropy: compute_entropy(&new_words, &possible_answers),
+            }
+        })
+        .collect();
+
+    // 只保留前10个最优路径
+    while solve.len() > 10 {
+        solve.pop();
+    }
+
+    let t = min(time, 3);
+    for _i in 1..t {
+        let mut new_heap: BinaryHeap<Path> = solve.par_iter()
+            .flat_map(|tmp_path| {
+                ACCEPTABLE.par_iter()
+                    .filter(|&&possible_guess| {
+                        !record.contains(&possible_guess.to_uppercase()) &&
+                        !tmp_path.words.contains(&possible_guess.to_uppercase())
+                    })
+                    .map(|&possible_guess| {
+                        let mut new_words = tmp_path.words.clone();
+                        new_words.push(possible_guess.to_uppercase());
+                        Path {
+                            words: new_words.clone(),
+                            entropy: compute_entropy(&new_words, &possible_answers),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        // 只保留前10个最优路径
+        while new_heap.len() > 10 {
+            new_heap.pop();
+        }
+        solve = new_heap;
+    }
+
+    let mut info: Vec<(String, f64)> = Vec::new();
+    while let Some(path) = solve.pop() {
+        info.push((path.words.first().unwrap().clone(), path.entropy));
+    }
+    info.reverse();
+    info
+}
+
+/*pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec<(String, f64)>
 {
     let mut possible_answers: Vec<String> = Vec::new();
 
@@ -156,7 +270,7 @@ pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec
         }
         let new_words = vec![possible_guess.to_uppercase()];
         solve.push(Path{ words: new_words.clone(), entropy: compute_entropy(&new_words, &possible_answers) });
-        if solve.len() > 20
+        if solve.len() > 10
         {
             solve.pop();
         }
@@ -177,7 +291,7 @@ pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec
                 let mut new_words = tmp_path.words.clone();
                 new_words.push(possible_guess.to_uppercase());
                 new.push(Path{ words: new_words.clone(), entropy: compute_entropy(&new_words, &possible_answers) });
-                if new.len() > 20
+                if new.len() > 10
                 {
                     new.pop();
                 }
@@ -193,4 +307,49 @@ pub fn solve(record: &Vec<String>, full_result: &Vec<[u8; 5]>, time: i32) -> Vec
     }
     info.reverse();
     info
+}*/
+
+pub fn test()
+{
+    let mut count = 0;
+    let mut steps = 0;
+    for answers in FINAL
+    {
+        let answer = Word::new(&answers.to_uppercase());
+        println!("{}", answer.origin);
+        let mut record: Vec<String> = Vec::new();
+        let mut full_result: Vec<[u8; 5]> = Vec::new();
+        let mut best_result: HashMap<char, u8> = HashMap::new();
+        let mut is_correct: bool = false;
+        record.push("SALET".to_string());
+        full_result.push(answer.compare("SALET"));
+        (best_result, is_correct) = game::user_update_and_show(&record, &full_result, best_result);
+        if is_correct
+        {
+            count += 1;
+            steps += 1;
+            println!("{} {}", count, steps);
+            continue;
+        }
+        for i in 2..=6
+        {
+            let help = solve(&record, &full_result, 6 - i);
+            record.push(help[0].0.clone());
+            full_result.push(answer.compare(&help[0].0));
+            (best_result, is_correct) = game::user_update_and_show(&record, &full_result, best_result);
+            if is_correct
+            {
+                count += 1;
+                steps += i;
+                println!("{} {} {}", count, i, steps);
+                break;
+            }
+        }
+        if !is_correct
+        {
+            count += 1;
+            steps += 7;
+            println!("{} {} {}", count, 7, steps);
+        }
+    }
 }
