@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             success_try += i.guesses.len() as i32;
                         }
                     }
-                    None => return Err(Box::new(MyError{source: "INVALID STATE".to_string()})),
+                    None => (),
                 }
                 for j in i.guesses.iter()
                 {
@@ -124,6 +124,7 @@ if !is_tty//测试模式
 while again
 {
     total_round += 1;
+    game_data.total_rounds += 1;
 
     //生成答案
     if let Some(_i) = cmd.mode.get("random")
@@ -168,8 +169,18 @@ while again
         let tmp = guess.origin.clone();
         record.push(tmp.clone());
         this_round.guesses.push(tmp.clone());
+        if i != 1 { game_data.games.pop(); }
+        game_data.games.push(this_round.clone());
         let count = total_word.entry(tmp.clone()).or_insert(0);
         *count += 1;
+
+        if let Some(state) = cmd.info.get("state")
+    {
+        if let Err(_) = file::write_state(&game_data, state)
+        {
+            return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+        }
+    }
 
         //更新结果
         tmp_result = answer.compare(&guess.origin);
@@ -188,8 +199,6 @@ while again
     }
 
     //更新游戏存档
-    game_data.games.push(this_round);
-    game_data.total_rounds += 1;
 
     //打印数据
     if let Some(_i) = cmd.mode.get("stats")
@@ -269,6 +278,7 @@ if is_ui//TUI模式
         str_output.clear();
         span_output.clear();
 
+        game_data.total_rounds += 1;
         total_round += 1;
     
         //生成答案
@@ -370,9 +380,20 @@ if is_ui//TUI模式
             let tmp = guess.origin.clone();
             record.push(tmp.clone());
             this_round.guesses.push(tmp.clone());
+            if i != 1 { game_data.games.pop(); }
+            game_data.games.push(this_round.clone());
             let count = total_word.entry(tmp.clone()).or_insert(0);
             *count += 1;
-    
+
+            if let Some(state) = cmd.info.get("state")
+    {
+        if let Err(_) = file::write_state(&game_data, state)
+        {
+            return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+        }
+    }
+
+
             tmp_result = answer.compare(&guess.origin);
             full_result.push(tmp_result);
             (best_result, is_correct) = game::tui_update_and_show(&record, &full_result, best_result, &mut span_output);
@@ -388,9 +409,6 @@ if is_ui//TUI模式
         {
             span_output.push(Spans::from(vec![Span::raw("FAILED "), Span::raw(answer.origin.clone())]));
         }
-        //更新游戏存档
-        game_data.games.push(this_round);
-        game_data.total_rounds += 1;
     
         //打印数据
         if let Some(_i) = cmd.mode.get("stats")
@@ -467,6 +485,7 @@ else//用户模式
 {
     while again
     {
+        game_data.total_rounds += 1;
         total_round += 1;
     
         //生成答案
@@ -555,8 +574,18 @@ else//用户模式
             let tmp = guess.origin.clone();
             record.push(tmp.clone());
             this_round.guesses.push(tmp.clone());
+            if i != 1 { game_data.games.pop(); }
+            game_data.games.push(this_round.clone());
             let count = total_word.entry(tmp.clone()).or_insert(0);
             *count += 1;
+
+            if let Some(state) = cmd.info.get("state")
+    {
+        if let Err(_) = file::write_state(&game_data, state)
+        {
+            return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+        }
+    }
     
             tmp_result = answer.compare(&guess.origin);
             full_result.push(tmp_result);
@@ -573,9 +602,6 @@ else//用户模式
         {
             println!("FAILED {}", answer.origin);
         }
-        //更新游戏存档
-        game_data.games.push(this_round);
-        game_data.total_rounds += 1;
     
         //打印数据
         if let Some(_i) = cmd.mode.get("stats")

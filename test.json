@@ -1,0 +1,17 @@
+{
+  "total_rounds": 2,
+  "games": [
+    {
+      "answer": "HELLO",
+      "guesses": [
+        "APPLE"
+      ]
+    },
+    {
+      "answer": "APPLE",
+      "guesses": [
+        "HELLO"
+      ]
+    }
+  ]
+}

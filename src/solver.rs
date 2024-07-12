@@ -339,7 +339,7 @@ pub fn test()
         {
             count += 1;
             steps += 1;
-            println!("{} {}", count, steps);
+            println!("{} 1 {}", count, steps);
             continue;
         }
         for i in 2..=6

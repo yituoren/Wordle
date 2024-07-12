@@ -6,7 +6,7 @@ use std::io::ErrorKind;
 use std::io::Read;
 
 //创建具有Serialize和Deserialize的结构体记录数据，方便读写
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Round
 {
     pub answer: String,
