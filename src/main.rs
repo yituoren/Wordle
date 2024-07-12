@@ -175,12 +175,12 @@ while again
         *count += 1;
 
         if let Some(state) = cmd.info.get("state")
-    {
-        if let Err(_) = file::write_state(&game_data, state)
         {
-            return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+            if let Err(_) = file::write_state(&game_data, state)
+            {
+                return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+            }
         }
-    }
 
         //更新结果
         tmp_result = answer.compare(&guess.origin);
@@ -386,13 +386,12 @@ if is_ui//TUI模式
             *count += 1;
 
             if let Some(state) = cmd.info.get("state")
-    {
-        if let Err(_) = file::write_state(&game_data, state)
-        {
-            return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
-        }
-    }
-
+            {
+                if let Err(_) = file::write_state(&game_data, state)
+                {
+                    return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+                }
+            }
 
             tmp_result = answer.compare(&guess.origin);
             full_result.push(tmp_result);
@@ -580,12 +579,12 @@ else//用户模式
             *count += 1;
 
             if let Some(state) = cmd.info.get("state")
-    {
-        if let Err(_) = file::write_state(&game_data, state)
-        {
-            return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
-        }
-    }
+            {
+                if let Err(_) = file::write_state(&game_data, state)
+                {
+                    return Err(Box::new(MyError{source: "FAILED TO WRITE STATE".to_string()}));
+                }
+            }
     
             tmp_result = answer.compare(&guess.origin);
             full_result.push(tmp_result);
