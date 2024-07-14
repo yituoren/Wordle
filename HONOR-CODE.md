@@ -3,13 +3,11 @@
 ## 开源代码仓库
 
 serde_json
-
-rand tui json
-
+rand
+tui
+json
 text_io serde
-
 crossterm
-
 rayon
 
 ## 查询
@@ -27,7 +25,7 @@ tui-Rust: [https://docs.rs/tui/latest/tui/](https://docs.rs/tui/latest/tui/)
 ### 杨凯森
 
 单步最优算法、全局最优算法、features功能
-                                                                                                                                                    
+    
 ### 章小龙
 
 程序鲁棒性
